@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 batch_size = 64
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-def get_datasets(test_domain, transform_train, seed=54, im_size=227):
+def get_datasets(test_domain, transform_train, im_size=227, seed=54):
     transform_test = transforms.Compose(
         [transforms.Resize(im_size),
          transforms.ToTensor(),
@@ -32,7 +32,7 @@ def get_datasets(test_domain, transform_train, seed=54, im_size=227):
     np.random.seed(seed)
     torch.cuda.manual_seed(seed)
     
-    train_idx, valid_idx = train_test_split(np.arange(len(train_dataset)), test_size=0.1, shuffle=True)
+    train_idx, valid_idx = train_test_split(np.arange(len(train_dataset)), test_size=0.1, shuffle=True, random_state=seed)
 
     trainset = torch.utils.data.Subset(train_dataset, train_idx)
     valset = torch.utils.data.Subset(train_dataset, valid_idx)
@@ -41,8 +41,8 @@ def get_datasets(test_domain, transform_train, seed=54, im_size=227):
     return trainset, valset, testset#, datasets
 
 
-def get_dataloaders(test_domain, transform_train, seed=54, im_size=227):
-    trainset, valset, testset = get_datasets(test_domain, transform_train, seed, im_size)
+def get_dataloaders(test_domain, transform_train, im_size=227, seed=54):
+    trainset, valset, testset = get_datasets(test_domain, transform_train, im_size=im_size, seed=seed)
     
     train_loader = torch.utils.data.DataLoader(trainset, batch_size=batch_size,
                                                shuffle=True, num_workers=4)
@@ -57,7 +57,7 @@ def get_dataloaders(test_domain, transform_train, seed=54, im_size=227):
 
 
 
-def get_data_erm(test_domain, seed=54, im_size=227):
+def get_data_erm(test_domain, im_size=227, seed=54):
     transform_train = transforms.Compose(
         [transforms.RandomResizedCrop(im_size, scale=(0.8, 1.0), ratio=(0.9, 1.1)),
          transforms.RandomHorizontalFlip(),
@@ -66,9 +66,9 @@ def get_data_erm(test_domain, seed=54, im_size=227):
          lambda x: x + 0.0 * torch.randn_like(x)]
     )
     
-    return get_dataloaders(test_domain, transform_train, seed, im_size)
+    return get_dataloaders(test_domain, transform_train, im_size=im_size, seed=seed)
 
-def get_data_ebm(test_domain, seed=54, im_size=64):
+def get_data_ebm(test_domain, im_size=64, seed=54):
     transform_train = transforms.Compose(
         [transforms.RandomResizedCrop(im_size, scale=(0.8, 1.0), ratio=(0.9, 1.1)),
          transforms.RandomHorizontalFlip(),
@@ -77,11 +77,11 @@ def get_data_ebm(test_domain, seed=54, im_size=64):
          lambda x: x + 0.05 * torch.randn_like(x)]
     )
     
-    train_loader, val_loader, test_loader = get_dataloaders(test_domain, transform_train, seed, im_size)
-    train_loader_unlabeled, _, _ = get_dataloaders(test_domain, transform_train, seed, im_size)
+    train_loader, val_loader, test_loader = get_dataloaders(test_domain, transform_train, im_size=im_size, seed=seed)
+    train_loader_unlabeled, _, _ = get_dataloaders(test_domain, transform_train, im_size=im_size, seed=seed)
     
     transform_buffer = transforms.Compose([transform_train, lambda x: x + 0.15 * torch.randn_like(x)])
-    train_loader_buffer, _, _ = get_dataloaders(test_domain, transform_buffer, seed, im_size)
+    train_loader_buffer, _, _ = get_dataloaders(test_domain, transform_buffer, im_size=im_size, seed=seed)
     
     return train_loader, train_loader_unlabeled, train_loader_buffer, val_loader, test_loader
 

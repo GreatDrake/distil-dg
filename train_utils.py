@@ -155,7 +155,8 @@ def train_distil(student, teacher, opt, scheduler, n_epochs, train_loader, val_l
             val_writer.add_scalar('accuracy', val_acc, epoch)
             test_writer.add_scalar('accuracy', test_acc, epoch)
         
-        scheduler.step()
+        if scheduler is not None:
+            scheduler.step()
         
     if save_path is None and writers is not None:
         wr_dir = writers[0].get_logdir()
