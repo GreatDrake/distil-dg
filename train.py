@@ -17,12 +17,12 @@ from train_utils import train_erm, train_distil
 
 parser = argparse.ArgumentParser("Energy Based Models")
 parser.add_argument("--type", choices=["erm", "distil"], default="erm")
-parser.add_argument("--model", choices=["resnet50", "resnet34", "resnet18"], default="resnet18")
-parser.add_argument("--teacher", choices=["resnet50", "resnet34", "resnet18"], default="resnet18")
+parser.add_argument("--model", choices=["resnet50", "resnet34", "resnet18", "bit50"], default="resnet18")
+parser.add_argument("--teacher", choices=["resnet50", "resnet34", "resnet18", "bit50"], default="resnet18")
 parser.add_argument("--teacher_ckpt", type=str, default="a")
 parser.add_argument("--optimizer", choices=["adam", "sgd"], default="sgd")
 parser.add_argument("--scheduler", choices=["none", "cosine"], default="cosine")
-parser.add_argument("--lr", type=float, default=0.05)
+parser.add_argument("--lr", type=float, default=0.01)
 parser.add_argument("--wd", type=float, default=1e-4)
 parser.add_argument("--momentum", type=float, default=0.9)
 parser.add_argument("--n_epochs", type=int, default=300)
@@ -46,6 +46,8 @@ def get_model(name):
     elif name == "resnet50":
         net = torchvision.models.resnet50(pretrained=True)
         net.fc = nn.Linear(2048, 7)
+    elif name == "bit50":
+        net = timm.create_model('resnetv2_50x1_bitm', pretrained=True, num_classes=7)
     return net
 
 def get_optimizer_and_scheduler(params, args):
