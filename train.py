@@ -28,6 +28,7 @@ parser.add_argument("--momentum", type=float, default=0.9)
 parser.add_argument("--n_epochs", type=int, default=300)
 parser.add_argument("--writer_name", type=str, default="a")
 parser.add_argument("--target_domain", type=str, default="art_painting")
+parser.add_argument("--dataset", type=str, choices=["pacs", "cifar10-c"], default="pacs")
 args = parser.parse_args()
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -37,18 +38,20 @@ tr_writer = SummaryWriter(writer_name + "_train")
 val_writer = SummaryWriter(writer_name + "_val")
 test_writer = SummaryWriter(writer_name + "_test")
 
-def get_model(name):
+def get_model(name, args):
+    pretrain = True if args.dataset == "pacs" else False
+    n_classes = 7 if args.dataset == "pacs" else 10
     if name == "resnet18":
-        net = torchvision.models.resnet18(pretrained=True)
-        net.fc = nn.Linear(512, 7)
+        net = torchvision.models.resnet18(pretrained=pretrain)
+        net.fc = nn.Linear(512, n_classes)
     elif name == "resnet34":
-        net = torchvision.models.resnet34(pretrained=True)
-        net.fc = nn.Linear(512, 7)
+        net = torchvision.models.resnet34(pretrained=pretrain)
+        net.fc = nn.Linear(512, n_classes)
     elif name == "resnet50":
-        net = torchvision.models.resnet50(pretrained=True)
-        net.fc = nn.Linear(2048, 7)
+        net = torchvision.models.resnet50(pretrained=pretrain)
+        net.fc = nn.Linear(2048, n_classes)
     elif name == "bit50":
-        net = timm.create_model('resnetv2_50x1_bitm', pretrained=True, num_classes=7)
+        net = timm.create_model('resnetv2_50x1_bitm', pretrained=pretrain, num_classes=n_classes)
     return net
 
 def get_optimizer_and_scheduler(params, args):
@@ -64,10 +67,11 @@ def get_optimizer_and_scheduler(params, args):
         
     return optimizer, scheduler
 
+im_size = 227 if args.dataset == "pacs" else 32
 if args.type == "erm":
-    train_loader, val_loader, test_loader = get_data_erm(args.target_domain)
+    train_loader, val_loader, test_loader = get_data_erm(args.dataset, args.target_domain, im_size=im_size)
     
-    net = get_model(args.model).to(device)
+    net = get_model(args.model, args).to(device)
     
     optimizer, scheduler = get_optimizer_and_scheduler(net.parameters(), args)
 
@@ -75,12 +79,12 @@ if args.type == "erm":
               writers=(tr_writer, val_writer, test_writer))
 
 elif args.type == "distil":
-    train_loader, val_loader, test_loader = get_data_distil(args.target_domain)
+    train_loader, val_loader, test_loader = get_data_distil(args.dataset, args.target_domain, im_size=im_size)
     
-    teacher_net = get_model(args.teacher).to(device)
+    teacher_net = get_model(args.teacher, args).to(device)
     teacher_net.load_state_dict(torch.load(args.teacher_ckpt))
     
-    student_net = get_model(args.model).to(device)
+    student_net = get_model(args.model, args).to(device)
     
     optimizer, scheduler = get_optimizer_and_scheduler(student_net.parameters(), args)
     

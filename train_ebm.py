@@ -47,7 +47,7 @@ tr_writer = SummaryWriter(writer_name + "_train")
 val_writer = SummaryWriter(writer_name + "_val")
 test_writer = SummaryWriter(writer_name + "_test")
 
-train_loader, train_loader_unlabeled, train_loader_buffer, val_loader, test_loader = get_data_ebm("art_painting", im_size=im_size)
+train_loader, train_loader_unlabeled, train_loader_buffer, val_loader, test_loader = get_data_ebm("pacs", "art_painting", im_size=im_size)
 
 if args.model == "resnet50_gn":
     net = timm.create_model('resnet50_gn', pretrained=True)
