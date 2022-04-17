@@ -27,6 +27,7 @@ parser.add_argument("--wd", type=float, default=1e-4)
 parser.add_argument("--momentum", type=float, default=0.9)
 parser.add_argument("--n_epochs", type=int, default=300)
 parser.add_argument("--writer_name", type=str, default="a")
+parser.add_argument("--target_domain", type=str, default="art_painting")
 args = parser.parse_args()
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -64,7 +65,7 @@ def get_optimizer_and_scheduler(params, args):
     return optimizer, scheduler
 
 if args.type == "erm":
-    train_loader, val_loader, test_loader = get_data_erm("art_painting")
+    train_loader, val_loader, test_loader = get_data_erm(args.target_domain)
     
     net = get_model(args.model).to(device)
     
@@ -74,7 +75,7 @@ if args.type == "erm":
               writers=(tr_writer, val_writer, test_writer))
 
 elif args.type == "distil":
-    train_loader, val_loader, test_loader = get_data_distil("art_painting")
+    train_loader, val_loader, test_loader = get_data_distil(args.target_domain)
     
     teacher_net = get_model(args.teacher).to(device)
     teacher_net.load_state_dict(torch.load(args.teacher_ckpt))

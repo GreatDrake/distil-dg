@@ -66,7 +66,15 @@ def get_data_erm(test_domain, im_size=227, seed=54):
          lambda x: x + 0.0 * torch.randn_like(x)]
     )
     
-    return get_dataloaders(test_domain, transform_train, im_size=im_size, seed=seed)
+    transform_base = transforms.Compose(
+        [transforms.ToTensor(),
+         transforms.Normalize((.5, .5, .5), (.5, .5, .5))]
+    )
+    
+    train_loader, _, _ = get_dataloaders(test_domain, transform_train, im_size=im_size, seed=seed)
+    _, val_loader, test_loader = get_dataloaders(test_domain, transform_base, im_size=im_size, seed=seed)
+
+    return train_loader, val_loader, test_loader
 
 def get_data_ebm(test_domain, im_size=64, seed=54):
     transform_train = transforms.Compose(

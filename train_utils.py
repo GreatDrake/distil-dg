@@ -107,8 +107,8 @@ def train_epoch_distil(student, teacher, optimizer, train_loader, T, alpha, mixu
         
         data, target1, target2, lmbd = mixup(data, target, mixup_alpha)
         
-        if writers is not None:
-            writers[0].add_image('mixup_images', (torchvision.utils.make_grid(data[:4]) + 1)/2)
+        #if writers is not None:
+        #    writers[0].add_image('mixup_images', (torchvision.utils.make_grid(data[:4]) + 1)/2)
         
         with torch.no_grad():
             teacher_output = teacher(data)
