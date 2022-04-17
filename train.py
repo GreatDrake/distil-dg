@@ -11,14 +11,16 @@ import random
 import matplotlib.pyplot as plt
 import argparse
 import timm
+from wideresnet import WRN
+import resnet
 
 from data import get_data_erm, get_data_distil
 from train_utils import train_erm, train_distil
 
-parser = argparse.ArgumentParser("Energy Based Models")
+parser = argparse.ArgumentParser("DG with ERM and Distillation")
 parser.add_argument("--type", choices=["erm", "distil"], default="erm")
-parser.add_argument("--model", choices=["resnet50", "resnet34", "resnet18", "bit50"], default="resnet18")
-parser.add_argument("--teacher", choices=["resnet50", "resnet34", "resnet18", "bit50"], default="resnet18")
+parser.add_argument("--model", choices=["resnet50", "resnet34", "resnet18", "bit50", "wrn28_10"], default="resnet18")
+parser.add_argument("--teacher", choices=["resnet50", "resnet34", "resnet18", "bit50", "wrn28_10"], default="resnet18")
 parser.add_argument("--teacher_ckpt", type=str, default="a")
 parser.add_argument("--optimizer", choices=["adam", "sgd"], default="sgd")
 parser.add_argument("--scheduler", choices=["none", "cosine"], default="cosine")
@@ -37,21 +39,34 @@ writer_name = "runs/" + args.writer_name
 tr_writer = SummaryWriter(writer_name + "_train")
 val_writer = SummaryWriter(writer_name + "_val")
 test_writer = SummaryWriter(writer_name + "_test")
+writers=(tr_writer, val_writer, test_writer)
+if args.writer_name == "a":
+    writers = None
+    
+im_size = 227 if args.dataset == "pacs" else 32
 
 def get_model(name, args):
     pretrain = True if args.dataset == "pacs" else False
     n_classes = 7 if args.dataset == "pacs" else 10
     if name == "resnet18":
-        net = torchvision.models.resnet18(pretrained=pretrain)
-        net.fc = nn.Linear(512, n_classes)
+        if args.dataset == "pacs":
+            net = torchvision.models.resnet18(pretrained=pretrain)
+            net.fc = nn.Linear(512, n_classes)
+        else:
+            net = resnet.ResNet18()
     elif name == "resnet34":
-        net = torchvision.models.resnet34(pretrained=pretrain)
-        net.fc = nn.Linear(512, n_classes)
+        if args.dataset == "pacs":
+            net = torchvision.models.resnet34(pretrained=pretrain)
+            net.fc = nn.Linear(512, n_classes)
+        else:
+            net = resnet.ResNet34()
     elif name == "resnet50":
         net = torchvision.models.resnet50(pretrained=pretrain)
         net.fc = nn.Linear(2048, n_classes)
     elif name == "bit50":
         net = timm.create_model('resnetv2_50x1_bitm', pretrained=pretrain, num_classes=n_classes)
+    elif name == "wrn28_10":
+        net = WRN(depth=28, width=10, n_classes=n_classes, im_sz=im_size)
     return net
 
 def get_optimizer_and_scheduler(params, args):
@@ -67,7 +82,6 @@ def get_optimizer_and_scheduler(params, args):
         
     return optimizer, scheduler
 
-im_size = 227 if args.dataset == "pacs" else 32
 if args.type == "erm":
     train_loader, val_loader, test_loader = get_data_erm(args.dataset, args.target_domain, im_size=im_size)
     
@@ -89,4 +103,4 @@ elif args.type == "distil":
     optimizer, scheduler = get_optimizer_and_scheduler(student_net.parameters(), args)
     
     train_distil(student_net, teacher_net, optimizer, scheduler, args.n_epochs, train_loader, val_loader, test_loader, 
-                 T=5, mixup_alpha=1.0, writers=(tr_writer, val_writer, test_writer))
+                 T=5, mixup_alpha=1.0, writers=writers)

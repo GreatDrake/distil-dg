@@ -125,10 +125,11 @@ class Wide_ResNet(nn.Module):
     
     
 class WRN(nn.Module):
-    def __init__(self, depth=28, width=1, norm=None, dropout_rate=0.0, n_classes=7, im_sz=64):
+    def __init__(self, depth=28, width=1, norm=None, dropout_rate=0.0, n_classes=7, im_sz=32):
         super(WRN, self).__init__()
         self.f = Wide_ResNet(depth, width, norm=norm, dropout_rate=dropout_rate)
         self.class_output = nn.Linear(self.f.last_dim * (im_sz//32) * (im_sz//32), n_classes)
+        self.energy_output = nn.Linear(self.f.last_dim * (im_sz//32) * (im_sz//32), 1)
 
 
     def forward(self, x, y=None):

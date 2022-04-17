@@ -86,9 +86,6 @@ def get_datasets_cifar(transform_train, im_size=227, seed=54):
     target_domains = []
     
     for name in [s[:s.find(".npy")] for s in os.listdir("CIFAR-10-C") if s != "labels.npy"]:
-        #if "noise" not in name:
-        #    continue
-        #print(name)
         ds = CIFAR10C(root="CIFAR-10-C", name=name, transform=transform_test)
         np.random.seed(hash(name) % 123456789)
         indices = np.random.choice(list(range(len(ds))), size=5000, replace=False)
@@ -106,13 +103,13 @@ def get_dataloaders(ds_name, test_domain, transform_train, im_size=227, seed=54)
         trainset, valset, testset = get_datasets_cifar(transform_train, im_size=im_size, seed=seed)
     
     train_loader = torch.utils.data.DataLoader(trainset, batch_size=batch_size,
-                                               shuffle=True, num_workers=4)
+                                               shuffle=True, num_workers=8)
 
     val_loader = torch.utils.data.DataLoader(valset, batch_size=batch_size,
-                                             shuffle=True, num_workers=4)
+                                             shuffle=True, num_workers=8)
 
     test_loader = torch.utils.data.DataLoader(testset, batch_size=batch_size,
-                                              shuffle=True, num_workers=4)
+                                              shuffle=True, num_workers=8)
     
     return train_loader, val_loader, test_loader
 
@@ -158,10 +155,10 @@ def get_data_ebm(ds_name, test_domain, im_size=64, seed=54):
     return train_loader, train_loader_unlabeled, train_loader_buffer, val_loader, test_loader
 
 
-def get_data_distil(ds_name, test_domain):
+def get_data_distil(ds_name, test_domain, im_size=227, seed=54):
     transform_train = transforms.Compose(
         [transforms.ColorJitter(brightness=(0.6, 1.5), contrast=(0.6, 1.5), saturation=(0.6, 1.5), hue=(-0.2, 0.2)),
-         transforms.RandomResizedCrop(227),
+         transforms.RandomResizedCrop(im_size),
          transforms.RandomHorizontalFlip(),
          transforms.ToTensor(),
          transforms.Normalize((.5, .5, .5), (.5, .5, .5)),
@@ -169,12 +166,13 @@ def get_data_distil(ds_name, test_domain):
     )
     
     transform_base = transforms.Compose(
-        [transforms.ToTensor(),
+        [transforms.Resize(im_size),
+         transforms.ToTensor(),
          transforms.Normalize((.5, .5, .5), (.5, .5, .5))]
     )
     
-    train_loader, _, _ = get_dataloaders(ds_name, test_domain, transform_train)
-    _, val_loader, test_loader = get_dataloaders(ds_name, test_domain, transform_base)
+    train_loader, _, _ = get_dataloaders(ds_name, test_domain, transform_train, im_size=im_size, seed=seed)
+    _, val_loader, test_loader = get_dataloaders(ds_name, test_domain, transform_base, im_size=im_size, seed=seed)
 
     return train_loader, val_loader, test_loader
 
