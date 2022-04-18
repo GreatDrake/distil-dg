@@ -19,8 +19,8 @@ from train_utils import train_erm, train_distil
 
 parser = argparse.ArgumentParser("DG with ERM and Distillation")
 parser.add_argument("--type", choices=["erm", "distil"], default="erm")
-parser.add_argument("--model", choices=["resnet50", "resnet34", "resnet18", "bit50", "wrn28_10"], default="resnet18")
-parser.add_argument("--teacher", choices=["resnet50", "resnet34", "resnet18", "bit50", "wrn28_10"], default="resnet18")
+parser.add_argument("--model", choices=["resnet50", "resnet34", "resnet18", "bit50", "wrn28_10", "wrn10_2"], default="resnet18")
+parser.add_argument("--teacher", choices=["resnet50", "resnet34", "resnet18", "bit50", "wrn28_10", "wrn10_2"], default="resnet18")
 parser.add_argument("--teacher_ckpt", type=str, default="a")
 parser.add_argument("--optimizer", choices=["adam", "sgd"], default="sgd")
 parser.add_argument("--scheduler", choices=["none", "cosine"], default="cosine")
@@ -67,6 +67,8 @@ def get_model(name, args):
         net = timm.create_model('resnetv2_50x1_bitm', pretrained=pretrain, num_classes=n_classes)
     elif name == "wrn28_10":
         net = WRN(depth=28, width=10, n_classes=n_classes, im_sz=im_size)
+    elif name == "wrn10_2":
+        net = WRN(depth=10, width=2, n_classes=n_classes, im_sz=im_size)
     return net
 
 def get_optimizer_and_scheduler(params, args):
@@ -96,7 +98,7 @@ elif args.type == "distil":
     train_loader, val_loader, test_loader = get_data_distil(args.dataset, args.target_domain, im_size=im_size)
     
     teacher_net = get_model(args.teacher, args).to(device)
-    teacher_net.load_state_dict(torch.load(args.teacher_ckpt))
+    teacher_net.load_state_dict(torch.load(args.teacher_ckpt))#["model_state_dict"])
     
     student_net = get_model(args.model, args).to(device)
     
