@@ -37,6 +37,25 @@ class CIFAR10C(torchvision.datasets.VisionDataset):
     
     def __len__(self):
         return len(self.data)
+    
+class ImageFolderDataset(torch.utils.data.Dataset):
+    def __init__(self, img_dir, transform):
+        self.img_dir = img_dir
+        self.transform = transform
+        self.img_files = os.listdir(img_dir)
+
+    def __len__(self):
+        return len(self.img_files)
+
+    def __getitem__(self, idx):
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+
+        img_name = os.path.join(self.img_dir, self.img_files[idx])
+        image = Image.open(img_name).convert("RGB")
+        tensor_image = self.transform(image)
+
+        return tensor_image, 0
 
 def get_datasets_pacs(test_domain, transform_train, im_size=227, seed=54):
     transform_test = transforms.Compose(
@@ -82,6 +101,9 @@ def get_datasets_cifar(transform_train, im_size=227, seed=54):
     
     trainset = torchvision.datasets.CIFAR10(root='./data_cifar', train=True, download=True, transform=transform_train)
     valset = torchvision.datasets.CIFAR10(root='./data_cifar', train=False, download=True, transform=transform_test)
+    
+    generated = ImageFolderDataset("jem_gen_images", transform=transform_train)
+    trainset = torch.utils.data.ConcatDataset([trainset, generated])
     
     target_domains = []
     
