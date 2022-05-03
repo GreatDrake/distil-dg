@@ -15,40 +15,40 @@ n_classes = 7
 
 ################################################################################
 
-def logsumexp_grad_1(net, x0):
-    net.eval()
-    x = x0.clone().detach().requires_grad_(True)
-    out = torch.logsumexp(net(x), dim=1).sum()
-    out.backward()
-    return x.grad.detach()
+#def logsumexp_grad_1(net, x0):
+#    net.eval()
+#    x = x0.clone().detach().requires_grad_(True)
+#    out = torch.logsumexp(net(x), dim=1).sum()
+#    out.backward()
+#    return x.grad.detach()
 
-def sample_from_model2(net, start_x, n_steps, step_size, noise_std):
-    net.eval()
-    x_t = start_x
-    for t in range(n_steps):
-        x_t += step_size * logsumexp_grad(net, x_t) + noise_std * torch.randn_like(x_t)
-        x_t = x_t.detach()
-    net.train()
-    return x_t
+#def sample_from_model2(net, start_x, n_steps, step_size, noise_std):
+#    net.eval()
+#    x_t = start_x
+#    for t in range(n_steps):
+#        x_t += step_size * logsumexp_grad(net, x_t) + noise_std * torch.randn_like(x_t)
+#        x_t = x_t.detach()
+#    net.train()
+#    return x_t
 
-def sample_from_model_aa(net, start_x, n_steps, step_size, noise_std):
-    net.eval()
-    start_x = torch.atanh(torch.clip(start_x, -0.9999, 0.9999))
-    x_k = start_x.clone().detach().requires_grad_(True)
-    for t in range(n_steps):
-        f_prime = torch.autograd.grad(torch.logsumexp(net(torch.tanh(x_k)), dim=1).sum(), [x_k], retain_graph=False)[0]
-        x_k.data += step_size * f_prime + noise_std * torch.randn_like(x_k)
-    net.train()
-    return torch.tanh(x_k).detach()
+#def sample_from_model_aa(net, start_x, n_steps, step_size, noise_std):
+#    net.eval()
+#    start_x = torch.atanh(torch.clip(start_x, -0.9999, 0.9999))
+#    x_k = start_x.clone().detach().requires_grad_(True)
+#    for t in range(n_steps):
+#        f_prime = torch.autograd.grad(torch.logsumexp(net(torch.tanh(x_k)), dim=1).sum(), [x_k], retain_graph=False)[0]
+#        x_k.data += step_size * f_prime + noise_std * torch.randn_like(x_k)
+#    net.train()
+#    return torch.tanh(x_k).detach()
 
-def total_grad_norm(model):
-    total_norm = 0
-    for p in model.parameters():
-        if p.grad is not None:
-            param_norm = p.grad.data.norm(2)
-            total_norm += param_norm.item() ** 2
-    total_norm = total_norm ** (1. / 2)
-    return total_norm
+#def total_grad_norm(model):
+#    total_norm = 0
+#    for p in model.parameters():
+#        if p.grad is not None:
+#            param_norm = p.grad.data.norm(2)
+#            total_norm += param_norm.item() ** 2
+#    total_norm = total_norm ** (1. / 2)
+#    return total_norm
 
 #def init_random_0(bs):
 #    classes = np.random.randint(n_classes, size=bs)
@@ -139,7 +139,7 @@ def ebm_loss(net, x, sample):
     return -torch.logsumexp(net(x), dim=1).mean() + torch.logsumexp(net(sample), dim=1).mean()
 
 def train_epoch_ebm(net, optimizer, replay_buffer, train_loader_xy, train_loader_x, train_loader_buffer,
-                    args, writers, epoch):
+                    args, writers, epoch, teacher_net=None):
     loss_log = []
     net.train()
     
@@ -160,6 +160,8 @@ def train_epoch_ebm(net, optimizer, replay_buffer, train_loader_xy, train_loader
             random_samples = init_random(len(x_unlabeled)).to(device)
         elif args.noise_init == "data":
             random_samples = x_buffer
+        elif args.noise_init == "uniform":
+            random_samples = torch.rand(*x_unlabeled.shape) * 2 - 1
 
         choose_random = (torch.rand(len(x_unlabeled)) < args.reinit_freq).float()[:, None, None, None].to(device)
         start_x = choose_random * random_samples + (1 - choose_random) * buffer_samples
@@ -169,7 +171,18 @@ def train_epoch_ebm(net, optimizer, replay_buffer, train_loader_xy, train_loader
         
         
         pred_y = net(x_labeled)
-        ce_loss = F.cross_entropy(pred_y, y)
+        
+        if teacher_net is not None:
+            T = 2.0
+            with torch.no_grad():
+                teacher_output = teacher_net(x_labeled)
+            ce_loss = F.kl_div(F.log_softmax(pred_y / T, dim=1), 
+                               F.softmax(teacher_output / T, dim=1), 
+                               reduction='batchmean') * T * T
+        else:
+            ce_loss = F.cross_entropy(pred_y, y)
+        
+        
         gen_loss = ebm_loss(net, x_unlabeled, sample)
         loss = ce_loss + gen_loss
         
@@ -208,10 +221,10 @@ def train_epoch_ebm(net, optimizer, replay_buffer, train_loader_xy, train_loader
     return loss_log
 
 def train_ebm(net, optimizer, scheduler, n_epochs, replay_buffer, train_loader_xy, train_loader_x, train_loader_buffer,
-              val_loader, test_loader, args, writers, save_path=None):
+              val_loader, test_loader, args, writers, save_path=None, teacher_net=None):
     for epoch in range(n_epochs):
         train_loss = train_epoch_ebm(net, optimizer, replay_buffer, train_loader_xy, train_loader_x, train_loader_buffer,
-                                     args, writers, epoch)
+                                     args, writers, epoch, teacher_net=teacher_net)
         val_loss, val_acc = test(net, val_loader)
         test_loss, test_acc = test(net, test_loader)
         

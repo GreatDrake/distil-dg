@@ -18,7 +18,7 @@ from wideresnet import WRN
 
 parser = argparse.ArgumentParser("Energy Based Models")
 
-parser.add_argument("--model", choices=["resnet50_gn", "wrn", "bit50"], default="resnet50_gn")
+parser.add_argument("--model", choices=["resnet50_gn", "wrn", "bit50", "resnet34"], default="resnet50_gn")
 
 parser.add_argument("--replay_buffer_size", type=int, default=1344)
 parser.add_argument("--reinit_freq", type=float, default=0.1)
@@ -33,9 +33,11 @@ parser.add_argument("--n_steps", type=int, default=30)
 parser.add_argument("--step_size", type=float, default=1.0)
 parser.add_argument("--noise_std", type=float, default=1e-2)
 
-parser.add_argument("--noise_init", choices=["mixture", "data"], default="mixture")
+parser.add_argument("--noise_init", choices=["mixture", "data", "uniform"], default="mixture")
 
 parser.add_argument("--writer_name", type=str, default="a")
+
+parser.add_argument("--teacher_ckpt", type=str, default="a")
 
 args = parser.parse_args()
 
@@ -49,14 +51,27 @@ test_writer = SummaryWriter(writer_name + "_test")
 
 train_loader, train_loader_unlabeled, train_loader_buffer, val_loader, test_loader = get_data_ebm("pacs", "art_painting", im_size=im_size)
 
-if args.model == "resnet50_gn":
-    net = timm.create_model('resnet50_gn', pretrained=True)
-    net.fc = nn.Linear(2048, n_classes)
-elif args.model == "bit50":
-    net = timm.create_model('resnetv2_50x1_bitm', pretrained=True, num_classes=n_classes)
-elif args.model == "wrn":
-    net = WRN(im_sz=im_size, depth=22, norm='layer')
-net = net.to(device)
+def get_model(name):
+    if name == "resnet50_gn":
+        net = timm.create_model('resnet50_gn', pretrained=True)
+        net.fc = nn.Linear(2048, n_classes)
+    elif name == "bit50":
+        net = timm.create_model('resnetv2_50x1_bitm', pretrained=True, num_classes=n_classes)
+    elif name == "wrn":
+        net = WRN(im_sz=im_size, depth=22, norm='layer')
+    elif name == "resnet34":
+        net = torchvision.models.resnet34(pretrained=True)
+        net.fc = nn.Linear(512, n_classes)
+    return net
+
+net = get_model(args.model).to(device)
+
+if args.teacher_ckpt != "a":
+    print(args.teacher_ckpt)
+    teacher_net = get_model(args.model).to(device)
+    teacher_net.load_state_dict(torch.load(args.teacher_ckpt))
+else:
+    teacher_net = None
 
 replay_buffer = torch.zeros(args.replay_buffer_size, 3, im_size, im_size).to(device)
 
@@ -65,6 +80,8 @@ if args.noise_init == "mixture":
     random_fill_buffer(replay_buffer)
 elif args.noise_init == "data":
     fill_buffer_from_data(replay_buffer, train_loader_buffer)
+elif args.noise_init == "uniform":
+    replay_buffer = torch.rand(*replay_buffer.shape) * 2 - 1
 
 replay_buffer = replay_buffer.to('cpu')
 
@@ -80,4 +97,4 @@ elif args.scheduler == "none":
     scheduler = None
 
 train_ebm(net, optimizer, scheduler, n_epochs, replay_buffer, train_loader, train_loader_unlabeled, train_loader_buffer,
-          val_loader, test_loader, args, writers=(tr_writer, val_writer, test_writer))
+          val_loader, test_loader, args, writers=(tr_writer, val_writer, test_writer), teacher_net=teacher_net)
