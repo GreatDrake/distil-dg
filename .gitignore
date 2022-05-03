@@ -1,9 +1,11 @@
+fid_is.py
+jem_gen_images/
+old/
+jem_wrn.pt
+voganesyan_ddpm_samples/
 cifar_debug.ipynb
 CIFAR-10-C.tar
 CIFAR-10-C/
-OfficeHomeDataset_10072016/
-office_home.zip
-vlcs/
 git_cs.txt
 base.ipynb
 .ipynb_checkpoints/
@@ -15,11 +17,9 @@ _train/
 _val/
 data_cifar/
 diploma_diff.ipynb
-ebm_2.py
 ebm_eval_tmp.py
 ebm_exp.ipynb
 kfold/
 models/
 runs/
-train_run_ebm_2.py
 
