@@ -19,8 +19,8 @@ from train_utils import train_erm, train_distil
 
 parser = argparse.ArgumentParser("DG with ERM and Distillation")
 parser.add_argument("--type", choices=["erm", "distil"], default="erm")
-parser.add_argument("--model", choices=["resnet50", "resnet34", "resnet18", "bit50", "wrn28_10", "wrn10_2"], default="resnet18")
-parser.add_argument("--teacher", choices=["resnet50", "resnet34", "resnet18", "bit50", "wrn28_10", "wrn10_2"], default="resnet18")
+parser.add_argument("--model", choices=["resnet50", "resnet34", "resnet18", "bit50", "wrn28_10", "wrn10_6"], default="resnet18")
+parser.add_argument("--teacher", choices=["resnet50", "resnet34", "resnet18", "bit50", "wrn28_10", "wrn10_6"], default="resnet18")
 parser.add_argument("--teacher_ckpt", type=str, default="a")
 parser.add_argument("--optimizer", choices=["adam", "sgd"], default="sgd")
 parser.add_argument("--scheduler", choices=["none", "cosine"], default="cosine")
@@ -31,6 +31,8 @@ parser.add_argument("--n_epochs", type=int, default=300)
 parser.add_argument("--writer_name", type=str, default="a")
 parser.add_argument("--target_domain", type=str, default="art_painting")
 parser.add_argument("--dataset", type=str, choices=["pacs", "cifar10-c"], default="pacs")
+parser.add_argument("--mixup_alpha", type=float, default=1.0)
+parser.add_argument("--temperature", type=float, default=5.0)
 args = parser.parse_args()
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -51,6 +53,7 @@ def get_model(name, args):
     if name == "resnet18":
         if args.dataset == "pacs":
             net = torchvision.models.resnet18(pretrained=pretrain)
+            #net = torchvision.models.resnet18(pretrained=False)
             net.fc = nn.Linear(512, n_classes)
         else:
             net = resnet.ResNet18()
@@ -67,8 +70,8 @@ def get_model(name, args):
         net = timm.create_model('resnetv2_50x1_bitm', pretrained=pretrain, num_classes=n_classes)
     elif name == "wrn28_10":
         net = WRN(depth=28, width=10, n_classes=n_classes, im_sz=im_size)
-    elif name == "wrn10_2":
-        net = WRN(depth=10, width=2, n_classes=n_classes, im_sz=im_size)
+    elif name == "wrn10_6":
+        net = WRN(depth=10, width=6, n_classes=n_classes, im_sz=im_size)
     return net
 
 def get_optimizer_and_scheduler(params, args):
@@ -105,4 +108,4 @@ elif args.type == "distil":
     optimizer, scheduler = get_optimizer_and_scheduler(student_net.parameters(), args)
     
     train_distil(student_net, teacher_net, optimizer, scheduler, args.n_epochs, train_loader, val_loader, test_loader, 
-                 T=5, mixup_alpha=1.0, writers=writers)
+                 T=args.temperature, mixup_alpha=args.mixup_alpha, writers=writers)

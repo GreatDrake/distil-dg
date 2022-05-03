@@ -105,8 +105,11 @@ def train_epoch_distil(student, teacher, optimizer, train_loader, T, alpha, mixu
         data = data.to(device)
         target = target.to(device)
         
-        data, target1, target2, lmbd = mixup(data, target, mixup_alpha)
-        
+        if mixup_alpha > 0.0:
+            data, target1, target2, lmbd = mixup(data, target, mixup_alpha)
+        else:
+            data, target1, target2, lmbd = data, target, target, 1.0
+
         #if writers is not None:
         #    writers[0].add_image('mixup_images', (torchvision.utils.make_grid(data[:4]) + 1)/2)
         
