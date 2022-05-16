@@ -85,6 +85,12 @@ def get_datasets_pacs(test_domain, transform_train, im_size=227, seed=54):
     valset = torch.utils.data.Subset(train_dataset, valid_idx)
     testset = datasets[test_name]
     
+    generated = ImageFolderDataset("jem_distil_samples_long", transform=transform_train)
+    indices = np.random.choice(list(range(len(generated))), size=len(trainset), replace=False)
+    trainset = torch.utils.data.ConcatDataset([trainset, Subset(generated, indices)])
+    
+    print(len(trainset), len(valset), len(testset))
+    
     return trainset, valset, testset
 
 def get_datasets_cifar(transform_train, im_size=227, seed=54):
@@ -102,7 +108,7 @@ def get_datasets_cifar(transform_train, im_size=227, seed=54):
     trainset = torchvision.datasets.CIFAR10(root='./data_cifar', train=True, download=True, transform=transform_train)
     valset = torchvision.datasets.CIFAR10(root='./data_cifar', train=False, download=True, transform=transform_test)
     
-    generated = ImageFolderDataset("jem_gen_images", transform=transform_train)
+    generated = ImageFolderDataset("ncsnpp_samples", transform=transform_train)
     trainset = torch.utils.data.ConcatDataset([trainset, generated])
     
     target_domains = []
@@ -115,6 +121,8 @@ def get_datasets_cifar(transform_train, im_size=227, seed=54):
     
     testset = torch.utils.data.ConcatDataset(target_domains)
     
+    print(len(trainset), len(valset), len(testset))
+
     return trainset, valset, testset
 
 
@@ -141,7 +149,6 @@ def get_data_erm(ds_name, test_domain, im_size=227, seed=54):
     print(im_size)
     transform_train = transforms.Compose(
         [transforms.RandomResizedCrop(im_size, scale=(0.8, 1.0), ratio=(0.9, 1.1)),
-         #transforms.RandomCrop(32, padding=4, padding_mode='reflect'),
          transforms.RandomHorizontalFlip(),
          transforms.ToTensor(),
          transforms.Normalize((.5, .5, .5), (.5, .5, .5)),
@@ -160,6 +167,7 @@ def get_data_erm(ds_name, test_domain, im_size=227, seed=54):
     return train_loader, val_loader, test_loader
 
 def get_data_ebm(ds_name, test_domain, im_size=64, seed=54):
+    print(im_size)
     transform_train = transforms.Compose(
         [transforms.RandomResizedCrop(im_size, scale=(0.8, 1.0), ratio=(0.9, 1.1)),
          transforms.RandomHorizontalFlip(),
@@ -178,6 +186,7 @@ def get_data_ebm(ds_name, test_domain, im_size=64, seed=54):
 
 
 def get_data_distil(ds_name, test_domain, im_size=227, seed=54):
+    print(im_size)
     transform_train = transforms.Compose(
         [transforms.ColorJitter(brightness=(0.6, 1.5), contrast=(0.6, 1.5), saturation=(0.6, 1.5), hue=(-0.2, 0.2)),
          transforms.RandomResizedCrop(im_size),
@@ -197,6 +206,8 @@ def get_data_distil(ds_name, test_domain, im_size=227, seed=54):
     _, val_loader, test_loader = get_dataloaders(ds_name, test_domain, transform_base, im_size=im_size, seed=seed)
 
     return train_loader, val_loader, test_loader
+
+################################################################################
 
 class NoisyDistilDataset(torch.utils.data.Dataset):
     def __init__(self, base_dataset, teacher, transform):

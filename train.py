@@ -19,8 +19,8 @@ from train_utils import train_erm, train_distil
 
 parser = argparse.ArgumentParser("DG with ERM and Distillation")
 parser.add_argument("--type", choices=["erm", "distil"], default="erm")
-parser.add_argument("--model", choices=["resnet50", "resnet34", "resnet18", "bit50", "wrn28_10", "wrn10_6"], default="resnet18")
-parser.add_argument("--teacher", choices=["resnet50", "resnet34", "resnet18", "bit50", "wrn28_10", "wrn10_6"], default="resnet18")
+parser.add_argument("--model", choices=["resnet50gn", "resnet34", "resnet18", "bit50", "wrn28_10", "wrn10_6"], default="resnet18")
+parser.add_argument("--teacher", choices=["resnet50gn", "resnet34", "resnet18", "bit50", "wrn28_10", "wrn10_6"], default="resnet18")
 parser.add_argument("--teacher_ckpt", type=str, default="a")
 parser.add_argument("--optimizer", choices=["adam", "sgd"], default="sgd")
 parser.add_argument("--scheduler", choices=["none", "cosine"], default="cosine")
@@ -53,7 +53,6 @@ def get_model(name, args):
     if name == "resnet18":
         if args.dataset == "pacs":
             net = torchvision.models.resnet18(pretrained=pretrain)
-            #net = torchvision.models.resnet18(pretrained=False)
             net.fc = nn.Linear(512, n_classes)
         else:
             net = resnet.ResNet18()
@@ -63,8 +62,8 @@ def get_model(name, args):
             net.fc = nn.Linear(512, n_classes)
         else:
             net = resnet.ResNet34()
-    elif name == "resnet50":
-        net = torchvision.models.resnet50(pretrained=pretrain)
+    elif name == "resnet50gn":
+        net = timm.create_model('resnet50_gn', pretrained=pretrain)
         net.fc = nn.Linear(2048, n_classes)
     elif name == "bit50":
         net = timm.create_model('resnetv2_50x1_bitm', pretrained=pretrain, num_classes=n_classes)
@@ -93,7 +92,7 @@ if args.type == "erm":
     net = get_model(args.model, args).to(device)
     
     optimizer, scheduler = get_optimizer_and_scheduler(net.parameters(), args)
-
+    
     train_erm(net, optimizer, args.n_epochs, train_loader, val_loader, test_loader, scheduler=scheduler, 
               writers=(tr_writer, val_writer, test_writer))
 
@@ -101,8 +100,17 @@ elif args.type == "distil":
     train_loader, val_loader, test_loader = get_data_distil(args.dataset, args.target_domain, im_size=im_size)
     
     teacher_net = get_model(args.teacher, args).to(device)
-    teacher_net.load_state_dict(torch.load(args.teacher_ckpt))#["model_state_dict"])
+    if "jem" in args.teacher_ckpt:
+        teacher_net.load_state_dict(torch.load(args.teacher_ckpt)["model_state_dict"])
+    else:
+        teacher_net.load_state_dict(torch.load(args.teacher_ckpt))
     
+    seed=12045912
+    random.seed(seed)
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    torch.cuda.manual_seed(seed)
+
     student_net = get_model(args.model, args).to(device)
     
     optimizer, scheduler = get_optimizer_and_scheduler(student_net.parameters(), args)

@@ -13,49 +13,6 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 im_size = 64
 n_classes = 7
 
-################################################################################
-
-#def logsumexp_grad_1(net, x0):
-#    net.eval()
-#    x = x0.clone().detach().requires_grad_(True)
-#    out = torch.logsumexp(net(x), dim=1).sum()
-#    out.backward()
-#    return x.grad.detach()
-
-#def sample_from_model2(net, start_x, n_steps, step_size, noise_std):
-#    net.eval()
-#    x_t = start_x
-#    for t in range(n_steps):
-#        x_t += step_size * logsumexp_grad(net, x_t) + noise_std * torch.randn_like(x_t)
-#        x_t = x_t.detach()
-#    net.train()
-#    return x_t
-
-#def sample_from_model_aa(net, start_x, n_steps, step_size, noise_std):
-#    net.eval()
-#    start_x = torch.atanh(torch.clip(start_x, -0.9999, 0.9999))
-#    x_k = start_x.clone().detach().requires_grad_(True)
-#    for t in range(n_steps):
-#        f_prime = torch.autograd.grad(torch.logsumexp(net(torch.tanh(x_k)), dim=1).sum(), [x_k], retain_graph=False)[0]
-#        x_k.data += step_size * f_prime + noise_std * torch.randn_like(x_k)
-#    net.train()
-#    return torch.tanh(x_k).detach()
-
-#def total_grad_norm(model):
-#    total_norm = 0
-#    for p in model.parameters():
-#        if p.grad is not None:
-#            param_norm = p.grad.data.norm(2)
-#            total_norm += param_norm.item() ** 2
-#    total_norm = total_norm ** (1. / 2)
-#    return total_norm
-
-#def init_random_0(bs):
-#    classes = np.random.randint(n_classes, size=bs)
-#    return means[classes].view(bs, 3, im_size, im_size) + torch.randn(bs, 3, im_size, im_size) * 0.1
-        
-################################################################################
-
 conditionals = []
 means = torch.zeros([n_classes, 3 * im_size * im_size]).to(device)
 covs = torch.zeros([n_classes, 3 * im_size * im_size, 3 * im_size * im_size]).to(device)
@@ -73,9 +30,6 @@ def init_conditionals(data_loader):
         means.index_add_(0, y, x.view(x.shape[0], -1))
         cnts.index_add_(0, y, torch.ones(x.shape[0]).to(device))
     means /= cnts[:, None]
-    
-    #for i in range(n_classes):
-    #    covs[i] = torch.eye(3 * im_size * im_size) * 0.1
     
     idx = 0
     for x, y in data_loader:
@@ -126,12 +80,9 @@ def fill_buffer_from_data(replay_buffer, data_loader):
 def sample_from_model(net, start_x, n_steps, step_size, noise_std):
     net.eval()
     x_k = start_x.clone().detach().requires_grad_(True)
-    #grad_norms = 0
     for t in range(n_steps):
         f_prime = torch.autograd.grad(torch.logsumexp(net(x_k), dim=1).sum(), [x_k], retain_graph=False)[0]
         x_k.data += step_size * f_prime + noise_std * torch.randn_like(x_k)
-        #grad_norms += f_prime.data.norm(2)
-    #print(f"grad norm: {grad_norms / n_steps}")
     net.train()
     return x_k.detach()
 
@@ -161,7 +112,7 @@ def train_epoch_ebm(net, optimizer, replay_buffer, train_loader_xy, train_loader
         elif args.noise_init == "data":
             random_samples = x_buffer
         elif args.noise_init == "uniform":
-            random_samples = torch.rand(*x_unlabeled.shape) * 2 - 1
+            random_samples = (torch.rand(*x_unlabeled.shape) * 2 - 1).to(device)
 
         choose_random = (torch.rand(len(x_unlabeled)) < args.reinit_freq).float()[:, None, None, None].to(device)
         start_x = choose_random * random_samples + (1 - choose_random) * buffer_samples
@@ -173,7 +124,7 @@ def train_epoch_ebm(net, optimizer, replay_buffer, train_loader_xy, train_loader
         pred_y = net(x_labeled)
         
         if teacher_net is not None:
-            T = 2.0
+            T = 5.0
             with torch.no_grad():
                 teacher_output = teacher_net(x_labeled)
             ce_loss = F.kl_div(F.log_softmax(pred_y / T, dim=1), 
